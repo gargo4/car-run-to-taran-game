@@ -387,15 +387,19 @@ body.layed #menu,body.layed #set,body.layed #pause,body.layed #msS,body.layed #m
     const wrap = a => { while (a > Math.PI)
         a -= 2 * Math.PI; while (a < -Math.PI)
         a += 2 * Math.PI; return a; };
+    const MOB = /Android|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && innerWidth < 1100);
+    const FORCE_ENV = /[?&]env=1/.test(location.search);
+    const NOENV = MOB && !FORCE_ENV; // PMREM на Mali/Adreno (three r128) даёт белую сцену
+    const PRMAX = MOB ? 1.5 : 2;
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf0d9a8);
     scene.fog = new THREE.Fog(0xf0d9a8, 70, 380);
     const cam = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, .1, 900);
-    const ren = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    const ren = new THREE.WebGLRenderer({ antialias: !MOB, powerPreference: 'high-performance' });
     ren.setSize(innerWidth, innerHeight);
-    ren.setPixelRatio(Math.min(devicePixelRatio, 2));
+    ren.setPixelRatio(Math.min(devicePixelRatio, PRMAX));
     ren.shadowMap.enabled = true;
-    ren.shadowMap.type = THREE.PCFSoftShadowMap;
+    ren.shadowMap.type = MOB ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
     ren.toneMapping = THREE.ACESFilmicToneMapping;
     ren.toneMappingExposure = 1.1;
     document.body.appendChild(ren.domElement);
@@ -403,7 +407,7 @@ body.layed #menu,body.layed #set,body.layed #pause,body.layed #msS,body.layed #m
     const hemi = new THREE.HemisphereLight(0xfff4d6, 0xb98c4a, .45); scene.add(hemi);
     const sun = new THREE.DirectionalLight(0xfff0d0, 1.6);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(MOB ? 1024 : 2048, MOB ? 1024 : 2048);
     sun.shadow.bias = -.0004;
     sun.shadow.normalBias = .03;
     Object.assign(sun.shadow.camera, { left: -35, right: 35, top: 35, bottom: -35, far: 150 });
@@ -416,7 +420,7 @@ body.layed #menu,body.layed #set,body.layed #pause,body.layed #msS,body.layed #m
     scene.add(sky);
     const envS = new THREE.Scene();
     envS.add(new THREE.Mesh(new THREE.SphereGeometry(50, 24, 16), skyMat));
-    scene.environment = new THREE.PMREMGenerator(ren).fromScene(envS).texture;
+    if (!NOENV) { try { scene.environment = new THREE.PMREMGenerator(ren).fromScene(envS).texture; } catch (e) { scene.environment = null; window.__showErr && window.__showErr(e); } }
     // Песок: текстура с крапинками, чтобы было видно движение
     const cv = document.createElement('canvas');
     cv.width = cv.height = 256;
@@ -2446,6 +2450,7 @@ body.layed #menu,body.layed #set,body.layed #pause,body.layed #msS,body.layed #m
         scene.background.copy(hor); scene.fog.color.copy(hor);
         sun.intensity = .25 + 1.35 * day; sun.color.setRGB(.6 + .4 * day, .7 + .24 * day - .3 * st, 1 - .18 * day - .4 * st);
         hemi.intensity = .2 + .25 * day; cloudMat.color.setRGB(.2 + .8 * day, .22 + .78 * day, .32 + .68 * day); ren.toneMappingExposure = .9 + .2 * day;
+        if (NOENV) { hemi.intensity += .35; }
         if (MAPI) { hemi.intensity *= .75; sun.intensity *= .65; ren.toneMappingExposure *= .92; }
         if (MAPI === 1) { hemi.intensity *= 1.25; sun.intensity *= .9; } // лес: тени мягче
         if (MAPI === 5) { sun.color.multiply(DPT); cloudMat.color.multiply(DPT); }
@@ -4901,7 +4906,7 @@ body.layed #menu,body.layed #set,body.layed #pause,body.layed #msS,body.layed #m
         OG.ver++;
     }
     // ===== адаптивное разрешение: срабатывает только если устройство реально не тянет =====
-    const QA = { avg: 16.7, t: 0, pr: Math.min(devicePixelRatio, 2), max: Math.min(devicePixelRatio, 2), state: 0, before: 0, cool: 0, off: false, steps: 0 };
+    const QA = { avg: 16.7, t: 0, pr: Math.min(devicePixelRatio, PRMAX), max: Math.min(devicePixelRatio, PRMAX), state: 0, before: 0, cool: 0, off: false, steps: 0 };
     function qApply() { ren.setPixelRatio(QA.pr); ren.setSize(innerWidth, innerHeight); }
     function qTick(ms) { try { qTick0(ms); } catch (e) { QA.off = true; console.error('qTick', e); } }
     function qTick0(ms) {
@@ -6765,7 +6770,7 @@ body.layed #menu,body.layed #set,body.layed #pause,body.layed #msS,body.layed #m
         sc.background = new THREE.Color(0xf0d9a8); sc.fog = new THREE.Fog(0xf0d9a8, 60, 380);
         MS.cam = new THREE.PerspectiveCamera(MS.fov, innerWidth / innerHeight, .1, 900); MS.cam.rotation.order = 'YXZ'; sc.add(MS.cam);
         sc.add(new THREE.HemisphereLight(0xfff4d6, 0xb98c4a, .6));
-        const sn = new THREE.DirectionalLight(0xfff0d0, 1.7); sn.position.set(40, 70, 28); sn.castShadow = true; sn.shadow.mapSize.set(2048, 2048); sn.shadow.bias = -.0004; sn.shadow.normalBias = .03;
+        const sn = new THREE.DirectionalLight(0xfff0d0, 1.7); sn.position.set(40, 70, 28); sn.castShadow = true; sn.shadow.mapSize.set(MOB ? 1024 : 2048, MOB ? 1024 : 2048); sn.shadow.bias = -.0004; sn.shadow.normalBias = .03;
         Object.assign(sn.shadow.camera, { left: -46, right: 46, top: 46, bottom: -46, near: 1, far: 220 }); sn.shadow.camera.updateProjectionMatrix(); MS.sun = sn; sc.add(sn, sn.target);
         const sm = skyMat.clone(); sm.uniforms.uH.value.setRGB(.94, .85, .66); sm.uniforms.uT.value.setRGB(.35, .58, .86);
         MS.dome = new THREE.Mesh(new THREE.SphereGeometry(260, 24, 16), sm); MS.dome.frustumCulled = false; sc.add(MS.dome);
@@ -7015,7 +7020,7 @@ body.layed #menu,body.layed #set,body.layed #pause,body.layed #msS,body.layed #m
     function mskFit() { const R = msk.ren, c = msk.cam, w = innerWidth, h = innerHeight; R.setSize(w, h); c.aspect = w / h; c.position.set(0, 1.25, w > h ? 4.7 : 5.3); c.lookAt(0, .88, 0); c.updateProjectionMatrix(); }
     function mskOpen() {
         const cv = document.createElement('canvas'); msk.el.insertBefore(cv, msk.el.firstChild); msk.cv = cv;
-        const R = msk.ren = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); R.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); R.shadowMap.enabled = true; if (THREE.sRGBEncoding) R.outputEncoding = THREE.sRGBEncoding;
+        const R = msk.ren = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); R.setPixelRatio(Math.min(devicePixelRatio || 1, PRMAX)); R.shadowMap.enabled = true; if (THREE.sRGBEncoding) R.outputEncoding = THREE.sRGBEncoding;
         const sc = msk.sc = new THREE.Scene(); sc.background = new THREE.Color(0x15171b); sc.fog = new THREE.Fog(0x15171b, 9, 24); msk.cam = new THREE.PerspectiveCamera(34, 1, .1, 60);
         const mt = (c, o) => new THREE.MeshStandardMaterial(Object.assign({ color: c, roughness: .8 }, o)), bx = (w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.receiveShadow = true; sc.add(o); return o; };
         const fl = new THREE.Mesh(new THREE.PlaneGeometry(40, 40).rotateX(-Math.PI / 2), mt(0x4a4d51, { roughness: .55, metalness: .15 })); fl.receiveShadow = true; sc.add(fl);
